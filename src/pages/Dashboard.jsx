@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 
@@ -12,13 +12,17 @@ const STATUS_COLORS = {
 }
 
 const STATUSES = ['APPLIED', 'INTERVIEWING', 'OFFER', 'REJECTED', 'ACCEPTED']
+const FREE_LIMIT = 30
 
 export default function Dashboard() {
-  const { user, logout } = useAuth()
+  const { user, logout, isPro, upgradeToPro } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [applications, setApplications] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [upgradeLoading, setUpgradeLoading] = useState(false)
   const [error, setError] = useState(null)
 
   const [form, setForm] = useState({
@@ -32,6 +36,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchApplications()
+
+    // Check if returning from successful Stripe payment
+    if (searchParams.get('upgraded') === 'true') {
+      upgradeToPro()
+    }
   }, [])
 
   const fetchApplications = async () => {
@@ -42,6 +51,25 @@ export default function Dashboard() {
       setError('Failed to load applications')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleAddClick = () => {
+    if (!isPro && applications.length >= FREE_LIMIT) {
+      setShowUpgradeModal(true)
+    } else {
+      setShowForm(!showForm)
+    }
+  }
+
+  const handleUpgrade = async () => {
+    setUpgradeLoading(true)
+    try {
+      const res = await api.post('/payments/create-checkout-session')
+      window.location.href = res.data.url
+    } catch (err) {
+      setError('Failed to start checkout')
+      setUpgradeLoading(false)
     }
   }
 
@@ -60,7 +88,11 @@ export default function Dashboard() {
       })
       fetchApplications()
     } catch (err) {
-      setError('Failed to create application')
+      if (err.response?.status === 429) {
+        setShowUpgradeModal(true)
+      } else {
+        setError('Failed to create application')
+      }
     }
   }
 
@@ -88,10 +120,51 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
 
+      {/* Upgrade Modal */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
+            <div className="text-4xl mb-4">🚀</div>
+            <h2 className="text-2xl font-bold text-white mb-2">Upgrade to Pro</h2>
+            <p className="text-gray-400 mb-6">
+              You've hit the free limit of {FREE_LIMIT} applications.
+              Upgrade once for unlimited tracking — forever.
+            </p>
+            <div className="bg-gray-800 rounded-xl p-4 mb-6">
+              <div className="text-3xl font-bold text-white">$4.99</div>
+              <div className="text-gray-400 text-sm mt-1">one-time payment · no subscription</div>
+            </div>
+            <ul className="text-left text-gray-300 text-sm space-y-2 mb-6">
+              <li>✅ Unlimited applications</li>
+              <li>✅ Unlimited interaction timeline</li>
+              <li>✅ All future features</li>
+            </ul>
+            <button
+              onClick={handleUpgrade}
+              disabled={upgradeLoading}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white font-semibold rounded-lg transition mb-3"
+            >
+              {upgradeLoading ? 'Redirecting to checkout...' : 'Upgrade for $4.99'}
+            </button>
+            <button
+              onClick={() => setShowUpgradeModal(false)}
+              className="w-full py-2 text-gray-500 hover:text-gray-300 text-sm transition"
+            >
+              Maybe later
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Navbar */}
       <nav className="border-b border-gray-800 bg-gray-900 px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-bold text-white">Internship Tracker</h1>
         <div className="flex items-center gap-4">
+          {isPro && (
+            <span className="text-xs px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/30 rounded-full font-medium">
+              PRO
+            </span>
+          )}
           <span className="text-gray-400 text-sm">{user?.email}</span>
           <button
             onClick={logout}
@@ -120,14 +193,39 @@ export default function Dashboard() {
 
         {/* Header row */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-white">
-            Applications{' '}
-            <span className="text-gray-500 font-normal text-base">
-              ({applications.length})
-            </span>
-          </h2>
+          <div>
+            <h2 className="text-lg font-semibold text-white">
+              Applications{' '}
+              <span className="text-gray-500 font-normal text-base">
+                ({applications.length}{!isPro && `/${FREE_LIMIT}`})
+              </span>
+            </h2>
+            {!isPro && (
+              <div className="mt-1">
+                <div className="w-48 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all"
+                    style={{ width: `${Math.min((applications.length / FREE_LIMIT) * 100, 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {FREE_LIMIT - applications.length > 0
+                    ? `${FREE_LIMIT - applications.length} remaining`
+                    : 'Limit reached — '}
+                  {FREE_LIMIT - applications.length <= 0 && (
+                    <button
+                      onClick={() => setShowUpgradeModal(true)}
+                      className="text-blue-400 hover:text-blue-300"
+                    >
+                      upgrade to pro
+                    </button>
+                  )}
+                </p>
+              </div>
+            )}
+          </div>
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={handleAddClick}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition"
           >
             {showForm ? 'Cancel' : '+ Add Application'}
@@ -145,7 +243,6 @@ export default function Dashboard() {
         {showForm && (
           <form onSubmit={handleCreate} className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-6 space-y-4">
             <h3 className="text-white font-semibold text-base mb-2">New Application</h3>
-
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Company Name *</label>
@@ -209,7 +306,6 @@ export default function Dashboard() {
                 />
               </div>
             </div>
-
             <div>
               <label className="block text-xs text-gray-400 mb-1">Notes</label>
               <textarea
@@ -220,7 +316,6 @@ export default function Dashboard() {
                 className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500 transition resize-none"
               />
             </div>
-
             <button
               type="submit"
               className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition"
@@ -261,7 +356,6 @@ export default function Dashboard() {
                     )}
                   </div>
                 </div>
-
                 <div className="flex items-center gap-3 ml-4">
                   <select
                     value={app.status}

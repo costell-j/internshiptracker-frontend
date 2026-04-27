@@ -165,6 +165,14 @@ export default function Dashboard() {
               PRO
             </span>
           )}
+          {!isPro && (
+            <button
+              onClick={() => setShowUpgradeModal(true)}
+              className="text-xs px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-full transition"
+            >
+              Upgrade to Pro
+            </button>
+          )}
           <span className="text-gray-400 text-sm">{user?.email}</span>
           <button
             onClick={logout}

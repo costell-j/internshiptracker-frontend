@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
+import FeedbackModal from '../components/FeedbackModal'
 
 const STATUS_COLORS = {
   APPLIED: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
@@ -22,6 +23,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
   const [upgradeLoading, setUpgradeLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -36,8 +38,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchApplications()
-
-    // Check if returning from successful Stripe payment
     if (searchParams.get('upgraded') === 'true') {
       upgradeToPro()
     }
@@ -120,6 +120,8 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
 
+      {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
+
       {/* Upgrade Modal */}
       {showUpgradeModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
@@ -173,6 +175,12 @@ export default function Dashboard() {
               Upgrade to Pro
             </button>
           )}
+          <button
+            onClick={() => setShowFeedback(true)}
+            className="text-sm text-gray-400 hover:text-white transition"
+          >
+            Feedback
+          </button>
           <span className="text-gray-400 text-sm">{user?.email}</span>
           <button
             onClick={logout}

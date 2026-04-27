@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
+import FeedbackModal from '../components/FeedbackModal'
 
 const INTERACTION_TYPES = ['NOTE', 'EMAIL', 'PHONE_SCREEN', 'INTERVIEW', 'OFFER', 'REJECTION']
 
@@ -30,6 +31,7 @@ export default function ApplicationDetail() {
   const [interactions, setInteractions] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
   const [error, setError] = useState(null)
 
   const [form, setForm] = useState({
@@ -104,15 +106,25 @@ export default function ApplicationDetail() {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
 
+      {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
+
       {/* Navbar */}
-      <nav className="border-b border-gray-800 bg-gray-900 px-6 py-4 flex items-center gap-4">
+      <nav className="border-b border-gray-800 bg-gray-900 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="text-gray-400 hover:text-white transition text-sm flex items-center gap-1"
+          >
+            ← Back
+          </button>
+          <h1 className="text-xl font-bold text-white">Internship Tracker</h1>
+        </div>
         <button
-          onClick={() => navigate('/dashboard')}
-          className="text-gray-400 hover:text-white transition text-sm flex items-center gap-1"
+          onClick={() => setShowFeedback(true)}
+          className="text-sm text-gray-400 hover:text-white transition"
         >
-          ← Back
+          Feedback
         </button>
-        <h1 className="text-xl font-bold text-white">Internship Tracker</h1>
       </nav>
 
       <div className="max-w-3xl mx-auto px-6 py-8">
@@ -223,8 +235,6 @@ export default function ApplicationDetail() {
           <div className="space-y-3">
             {interactions.map((interaction, index) => (
               <div key={interaction.id} className="flex gap-4">
-
-                {/* Timeline line */}
                 <div className="flex flex-col items-center">
                   <div className="w-8 h-8 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-sm flex-shrink-0">
                     {TYPE_ICONS[interaction.type]}
@@ -233,8 +243,6 @@ export default function ApplicationDetail() {
                     <div className="w-px flex-1 bg-gray-800 mt-2" />
                   )}
                 </div>
-
-                {/* Content */}
                 <div className="flex-1 pb-6">
                   <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-gray-700 transition">
                     <div className="flex items-start justify-between gap-3">

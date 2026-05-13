@@ -15,6 +15,17 @@ const STATUS_COLORS = {
 const STATUSES = ['APPLIED', 'INTERVIEWING', 'OFFER', 'REJECTED', 'ACCEPTED']
 const FREE_LIMIT = 30
 
+const PERIODS = [
+  'Spring 2025',
+  'Summer 2025',
+  'Fall 2025',
+  'Spring 2026',
+  'Summer 2026',
+  'Fall 2026',
+  'Spring 2027',
+  'Summer 2027',
+]
+
 export default function Dashboard() {
   const { user, logout, isPro, upgradeToPro } = useAuth()
   const navigate = useNavigate()
@@ -26,6 +37,8 @@ export default function Dashboard() {
   const [showFeedback, setShowFeedback] = useState(false)
   const [upgradeLoading, setUpgradeLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [activePeriod, setActivePeriod] = useState('')
+  const [customPeriod, setCustomPeriod] = useState('')
 
   const [form, setForm] = useState({
     company: { name: '', website: '', industry: '', location: '' },
@@ -33,19 +46,36 @@ export default function Dashboard() {
     status: 'APPLIED',
     location: '',
     appliedDate: '',
+    period: '',
     notes: ''
   })
 
+
   useEffect(() => {
-    fetchApplications()
+    fetchApplications(activePeriod)
     if (searchParams.get('upgraded') === 'true') {
       upgradeToPro()
     }
-  }, [])
+  }, [activePeriod])
 
-  const fetchApplications = async () => {
+  const handlePeriodChange = (period) => {
+    setActivePeriod(period)
+    setCustomPeriod('')
+  }
+
+  const handleCustomPeriod = (e) => {
+    e.preventDefault()
+    if (customPeriod.trim()) {
+      setActivePeriod(customPeriod.trim())
+    }
+  }
+
+
+  const fetchApplications = async (period = '') => {
     try {
-      const res = await api.get('/applications?sortBy=appliedDate')
+      const params = new URLSearchParams({ sortBy: 'appliedDate' })
+      if (period) params.append('period', period)
+      const res = await api.get(`/applications?${params}`)
       setApplications(res.data.content)
     } catch (err) {
       setError('Failed to load applications')
@@ -53,6 +83,7 @@ export default function Dashboard() {
       setLoading(false)
     }
   }
+
 
   const handleAddClick = () => {
     if (!isPro && applications.length >= FREE_LIMIT) {
@@ -84,6 +115,7 @@ export default function Dashboard() {
         status: 'APPLIED',
         location: '',
         appliedDate: '',
+        period: '',
         notes: ''
       })
       fetchApplications()
@@ -207,6 +239,61 @@ export default function Dashboard() {
           ))}
         </div>
 
+          {/* Period filter */}
+          <div className="flex items-center gap-2 mb-6 flex-wrap">
+            <button
+              onClick={() => handlePeriodChange('')}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition border ${
+                activePeriod === ''
+                  ? 'bg-blue-600 border-blue-600 text-white'
+                  : 'bg-gray-900 border-gray-700 text-gray-400 hover:text-white'
+              }`}
+            >
+              All
+            </button>
+            {PERIODS.map(period => (
+              <button
+                key={period}
+                onClick={() => handlePeriodChange(period)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition border ${
+                  activePeriod === period
+                    ? 'bg-blue-600 border-blue-600 text-white'
+                    : 'bg-gray-900 border-gray-700 text-gray-400 hover:text-white'
+                }`}
+              >
+                {period}
+              </button>
+            ))}
+
+            {/* Custom period input */}
+            <form onSubmit={handleCustomPeriod} className="flex items-center gap-2">
+              <input
+                value={customPeriod}
+                onChange={e => setCustomPeriod(e.target.value)}
+                placeholder="Custom period..."
+                className="px-3 py-1.5 bg-gray-900 border border-gray-700 rounded-full text-xs text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 transition w-32"
+              />
+              {customPeriod && (
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 text-xs rounded-full transition"
+                >
+                  Filter
+                </button>
+              )}
+            </form>
+
+            {/* Clear custom filter */}
+            {activePeriod && !PERIODS.includes(activePeriod) && (
+              <button
+                onClick={() => handlePeriodChange('')}
+                className="px-3 py-1.5 bg-blue-600 border-blue-600 text-white text-xs rounded-full font-medium"
+              >
+                {activePeriod} ×
+              </button>
+            )}
+          </div>
+
         {/* Header row */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -321,6 +408,35 @@ export default function Dashboard() {
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 transition"
                 />
               </div>
+              <div className="col-span-2">
+                <label className="block text-xs text-gray-400 mb-1">Internship Period</label>
+                <select
+                  value={PERIODS.includes(form.period) ? form.period : form.period ? 'custom' : ''}
+                  onChange={e => {
+                    if (e.target.value === 'custom') {
+                      setForm({ ...form, period: '' })
+                    } else {
+                      setForm({ ...form, period: e.target.value })
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 transition appearance-none cursor-pointer"
+                >
+                  <option value="">No period</option>
+                  {PERIODS.map(p => (
+                    <option key={p} value={p} className="bg-gray-800">{p}</option>
+                  ))}
+                  <option value="custom">Custom...</option>
+                </select>
+                {!PERIODS.includes(form.period) && form.period !== '' && (
+                  <input
+                    value={form.period}
+                    onChange={e => setForm({ ...form, period: e.target.value })}
+                    placeholder="e.g. Winter 2027"
+                    className="w-full mt-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500 transition"
+                  />
+                )}
+              </div>
+
             </div>
             <div>
               <label className="block text-xs text-gray-400 mb-1">Notes</label>
@@ -367,6 +483,9 @@ export default function Dashboard() {
                   </div>
                   <div className="text-sm text-gray-400 mt-0.5">
                     {app.role}
+                    {app.period && (
+                      <span className="text-gray-600 ml-2">· {app.period}</span>
+                    )}
                     {app.appliedDate && (
                       <span className="text-gray-600 ml-2">· {app.appliedDate}</span>
                     )}
